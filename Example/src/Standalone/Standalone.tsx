@@ -5,11 +5,12 @@ import Basic from './Basic';
 import StandaloneMap from './Map';
 import FullFeatured from './FullFeatured';
 import { List } from '../Navigation';
+import BasicCarouselScreen from './Carousel';
 
 const Stack = createStackNavigator();
 
 function StandaloneHome() {
-  return <List items={['Basic', 'Full featured', 'Map as items']} />;
+  return <List items={['Basic', 'Full featured', 'Map as items', 'Carousel']} />;
 }
 
 export default function App() {
@@ -28,7 +29,8 @@ export default function App() {
         name="Full featured"
         component={FullFeatured}
         options={FullFeatured.options}
-      />
+        />
+      <Stack.Screen component={BasicCarouselScreen} name="Carousel" />
     </Stack.Navigator>
   );
 }
