@@ -43,6 +43,12 @@ const styles = {
   },
 };
 
+const defaultConstants = {
+  MAX_SCALE: 2,
+  MIN_SCALE: 0.7,
+  OVER_SCALE: 0.5,
+}
+
 const defaultTimingConfig = {
   duration: 250,
   easing: Easing.bezier(0.33, 0.01, 0, 1),
@@ -94,11 +100,12 @@ export const SimpleScalableImage = React.memo<SimpleScalableImageProps>(
     style,
     onDoubleTap = workletNoop,
     onInteraction = workletNoop,
-    MAX_SCALE = 3,
-    MIN_SCALE = 0.9,
-    OVER_SCALE = 0.5,
+    MAX_SCALE = defaultConstants.MAX_SCALE,
+    MIN_SCALE = defaultConstants.MIN_SCALE,
+    OVER_SCALE = defaultConstants.OVER_SCALE,
     timingConfig = defaultTimingConfig,
     enabled = true,
+    dataCount,
   }) => {
     fixGestureHandler();
 
@@ -127,8 +134,8 @@ export const SimpleScalableImage = React.memo<SimpleScalableImageProps>(
 
     const pinchState = useSharedValue<State>(State.UNDETERMINED);
 
+    const zindex = useSharedValue(-1);
     const scale = useSharedValue(1);
-    const zindex = useSharedValue(0);
     const scaleOffset = useSharedValue(1);
     const translation = vec.useSharedVector(0, 0);
     const scaleTranslation = vec.useSharedVector(0, 0);
@@ -142,6 +149,8 @@ export const SimpleScalableImage = React.memo<SimpleScalableImageProps>(
     const scaleFactor = width / targetWidth;
     const targetHeight = height / scaleFactor;
 
+
+    // TODO: check
     function resetSharedState(animated?: boolean) {
       'worklet';
 
@@ -239,9 +248,7 @@ export const SimpleScalableImage = React.memo<SimpleScalableImageProps>(
         cancelAnimation(offset.x);
         cancelAnimation(offset.y);
         vec.set(ctx.origin, ctx.adjustFocal);
-
-        zindex.value = 10000
-        console.log('zindex start',zindex.value )
+        zindex.value = 10
       },
 
       onActive: (evt, ctx) => {
@@ -259,14 +266,11 @@ export const SimpleScalableImage = React.memo<SimpleScalableImageProps>(
       },
 
       onEnd: () => {
-        scaleTranslation.x.value = withTiming(0, timingConfig, () => { zindex.value = 0 })
+        scaleTranslation.x.value = withTiming(0, timingConfig, () => {zindex.value = -1})
         scaleTranslation.y.value = withTiming(0, timingConfig)
 
         scale.value = withTiming(1, timingConfig);
         scaleOffset.value = 1;
-
-        zindex.value = 0
-        console.log('zindex end', zindex.value)
       },
     });
 
@@ -306,7 +310,6 @@ export const SimpleScalableImage = React.memo<SimpleScalableImageProps>(
       onStateChange(isInactive);
 
       return {
-        zIndex: zindex.value,
         transform: [
           {
             translateX:
@@ -325,8 +328,23 @@ export const SimpleScalableImage = React.memo<SimpleScalableImageProps>(
       };
     });
 
+    const animatedBlackStyles = useAnimatedStyle(() => {
+      return {
+        backgroundColor:'black',
+        opacity: 1 - 1/scale.value + 0.1,
+        zIndex: 0,
+        flex:1,
+        transform: [
+          {
+            scale: scale.value > 1 ? 10 : 0
+          }
+        ]
+      }
+    })
+
     return (
       <Animated.View style={[styles.container, { width }, style]}>
+        <Animated.View style={animatedBlackStyles}/>
         <PinchGestureHandler
           enabled={enabled}
           ref={pinchRef}
@@ -359,7 +377,6 @@ export const SimpleScalableImage = React.memo<SimpleScalableImageProps>(
                     style={{
                       width: targetWidth,
                       height: targetHeight,
-                      zIndex: zindex.value
                     }}
                   />
 
