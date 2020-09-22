@@ -4,7 +4,7 @@ import {
   GalleryItemType,
   SimpleScalableImage,
   Pager,
-} from 'reanimated-gallery';
+} from 'react-native-gallery-toolkit';
 import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 import { FlatList } from 'react-native-gesture-handler';
 // import { useRoute } from '@react-navigation/native';
