@@ -1,29 +1,50 @@
 <p align="center">
-  <h1 align="center">Reanimated Gallery</h1>
-  <h3 align="center"> Reanimated 2 powered Gallery implementation</h3>
+  <h1 align="center">React Native Gallery Toolkit</h1>
+  <h3 align="center"> Reanimated 2 and Gesturer Handler powered Gallery implementation</h3>
 </p>
 
-# Development status
+<p align="center">
+  <img width="200" height="400" src="gifs/promo.gif" alt="Gallery in action gif">
+</p>
 
-Currently, only standalone gallery (which you can render on a separate screen) is available. I'm preparing documentation for Pager and ImageTransformer components.
+[![npm](https://img.shields.io/npm/v/react-native-gallery-toolkit.svg?style=plastic)](https://npmjs.com/package/react-native-gallery-toolkit)
 
-![Gallery in action gif](gifs/promo.gif)
+- [Installation](#installation)
+- [Standalone gallery](#standalone-gallery)
+  - [Limitations](#limitations)
+  - [Base props](#base-props)
+  - [Advance props](#advance-props)
+  - [Handlers](#handlers)
+  - [Methods](#methods)
+- [Pager](#pager)
+- [Transformer](#transformer)
+- [Examples](#examples)
+  - [Running on iOS](#running-on-ios)
+  - [Running on Android](#running-on-android)
+- [LICENSE](#license)
+
+**Important!**
+
+The library uses Reanimated 2 alpha. It means that it may be unstable.
+Also, the library itself is in the alpha testing stage and may contain bugs.
 
 ## Installation
 
 Use npm or yarn to install the library
 
 ```bash
-npm i --save reanimated-gallery
+npm i --save react-native-gallery-toolkit
 ```
 
-> Also, you need to install latest [react-native-reanimated](https://github.com/software-mansion/react-native-reanimated) (then new 2 version) and [react-native-gesture-handler](https://github.com/software-mansion/react-native-gesture-handler), and follow their installation instructions.
+> Also, you need to install [react-native-reanimated@alpha.6](https://github.com/software-mansion/react-native-reanimated) (then new 2 version) and [react-native-gesture-handler](https://github.com/software-mansion/react-native-gesture-handler), and follow their installation instructions.
 
 Expo is not currently supported because it doesn't support Reanimated 2.
 
-## Usage
+**Important!**
 
-### Standalone gallery
+There is a bug in *react-native-reanimated@alpha.6* that causes gesture event handlers to reattach on each render. You can apply [this patch](./Example/patches/react-native-reanimated+2.0.0-alpha.6.patch) to workaround it.
+
+## Standalone gallery
 
 Standalone gallery renders Pager which supports thousands of images thanks to virtualization. Each page renders ImageTransformer component which gives ability to pinch-to-zoom, double tap to zoom, also you can run custom callbacks and worklets on on tab, double tap, pan.
 
@@ -32,7 +53,7 @@ import {
   StandaloneGallery,
   GalleryItemType,
   StandaloneGalleryHandler,
-} from 'reanimated-gallery';
+} from 'react-native-gallery-toolkit';
 
 const images: GalleryItemType[] = [
   {
@@ -55,23 +76,67 @@ export default function App() {
 
 ```
 
-For full example see [Examples](#examples).
+See [Full featured example](./Example/src/Standalone/FullFeatured.tsx) for example of usage of all the props.
 
-#### Props
+### Limitations
+
+- Only portrait orientation currently supported
+- There is no way to change dimensions without full re-render of the gallery
+- Debugging is not supported because of Reanimated v2 uses TurboModules. Use flipper to debug your JS Context.
+- On Android tap on hold on the screen while page changes doesn't trigger animation to stop due to bug in Gesture Handler.
+
+### Base props
+
+Prop | Description | Type | Default
+------ | ------ | -------- | ------
+`items` | The array of items to render. But can also accept Map, Set, or Object with keys. If the type is not array, then `getTotalCount` and `getItem` should be defined too. | `Array<{ width: number, height: number, id: string, uri: string  }>` | `undefined`
+`width?` | Viewport width | `number` | `Dimensions.get('window').width`
+`height?` | Viewport height | `number` | `Dimensions.get('window').height`
+`numToRender?` | How many pages should be rendered at the same time | `number` | 2
+`gutterWidth?` | The width of the gutter between pages | `number` | 0
+`initialIndex?` | The initial page index | `number` | 0
+`keyExtractor?` | Callback which extract the key of the page. Receives current item of the provided `items` as well as current index | `(item: T, index: number) => string` | Uses index as a key by default
+
+### Advance props
+
+Prop | Description | Type | Default
+------ | ------ | ------ | ------
+`getTotalCount?` | If the type of `items` is not an array, then this method should be defined to provide the total count of items | `(data: T) => number` | Required when `items` is not an array
+`getItem?` | If the type of `items` is not an array, then this method should be defined to provide the current item based on the index. Can return either the `item` or `undefined`. | `(data: T, index: number) => ItemT or undefined` | Required when `items` is not an array
+`renderImage?` | Callback that can be used to render custom image component. As an example, it can be used to render custom loading/error states | `(props: RenderImageProps) => JSX.Element` | `() => Image`
+`renderPage?` | Callback that can be used to render custom page. Can be used to display some non-image pages such as Video, for instance | `(props: ImageRendererProps<T>, index: number) => JSX.Element` | `ImageTransformer`
+
+### Handlers
+
+Prop | Description | Type | Is worklet? | Default
+------ | ------ | ------ | ------ | ------
+`onIndexChange?` | Fires when active index changes | `(nextIndex: number) => void`  | `Function` or `Worklet` | `undefined`
+`onTap?` | Executes when tap image transformer receives tap | `() => void` | `Function` or `Worklet` | `undefined`
+`onDoubleTap?` | Executes when tap image transformer receives double-tap  | `() => void` | `Function` or `Worklet` | `undefined`
+`onInteraction?` | Is called when either pan or scale has happened. | `(type: 'scale' or 'pan') => void` | `Function` or `Worklet` | `undefined`
+`onPagerTranslateChange?` | Executes on pager's horizontal pan | `(translateX: number) => void` | `Function` or `Worklet` | `undefined`
+`onGesture?` | Executes on pager's gesture | `(event: PanGestureHandlerGestureEvent, isActive: SharedValue<boolean>) => void` | `Function` or `Worklet` | `undefined`
+`shouldPagerHandleGestureEvent?` | Worklet that will be passed to pager's `shouldHandleEvent` to determine should pager handle this event. Can be used to handle "swipe down to close".  | `(event: PanGestureHandlerGestureEvent) => boolean` | Only `Worklet` | `undefined`
+
+### Methods
+
+Name | Description | Type
+------ | ------ | ------
+`goNext` | Changes the active index forward | `() => void`
+`goBack` | Changes the active index backward | `() => void`
+`setIndex` | Sets the active index | `(nextIndex: number) => void`
+
+## Pager
 
 WIP
 
-### Pager
-
-WIP
-
-### Transformer
+## Transformer
 
 WIP
 
 ## Examples
 
-The source code for the example (showcase) app is under the [`Example/`](https://github.com/terrysahaidak/reanimated-gallery/blob/master/Example/) directory.
+The source code for the example (showcase) app is under the [`Example/`](https://github.com/terrysahaidak/react-native-gallery-toolkit/blob/master/Example/) directory.
 Clone the repo, go to the Example/ folder and run:
 
 ```bash

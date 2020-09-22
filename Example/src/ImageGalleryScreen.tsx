@@ -11,7 +11,7 @@ import {
   useGalleryItem,
   GalleryOverlay,
   GalleryProvider,
-} from 'reanimated-gallery';
+} from 'react-native-gallery-toolkit';
 
 const dimensions = Dimensions.get('window');
 
@@ -80,7 +80,7 @@ function ListItem({ item, index }) {
     return {
       opacity: opacity.value,
     };
-  });
+  }, []);
 
   return (
     <TouchableWithoutFeedback

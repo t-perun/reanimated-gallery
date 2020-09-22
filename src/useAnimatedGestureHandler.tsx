@@ -1,14 +1,10 @@
 import { useRef, useCallback } from 'react';
 import { Platform } from 'react-native';
-import Animated, {
+import {
   makeRemote,
   useEvent,
-  useDerivedValue,
 } from 'react-native-reanimated';
-import {
-  GestureHandlerGestureEvent,
-  GestureHandlerStateChangeEvent,
-} from 'react-native-gesture-handler';
+import { GestureHandlerGestureEvent } from 'react-native-gesture-handler';
 
 function useRemoteContext<T extends object>(initialValue: T) {
   const initRef = useRef<{ context: T } | null>(null);
@@ -22,24 +18,7 @@ function useRemoteContext<T extends object>(initialValue: T) {
   return context;
 }
 
-export function useDiff(sharedValue: Animated.SharedValue<any>) {
-  const context = useRemoteContext({
-    stash: 0,
-    prev: null,
-  });
-
-  return useDerivedValue(() => {
-    context.stash =
-      context.prev !== null
-        ? sharedValue.value - (context.prev ?? 0)
-        : 0;
-    context.prev = sharedValue.value;
-
-    return context.stash;
-  });
-}
-
-export function diff(context: any, name: string, value: any) {
+function diff(context: any, name: string, value: any) {
   'worklet';
 
   if (!context.___diffs) {
@@ -90,7 +69,7 @@ interface GestureHandlers<T, TContext extends Context> {
   ) => void;
 }
 
-type OnGestureEvent<T> = (event: T) => void;
+type OnGestureEvent<T extends GestureHandlerGestureEvent> = (event: T) => void;
 
 export function createAnimatedGestureHandler<
   T extends GestureHandlerGestureEvent,
@@ -101,9 +80,7 @@ export function createAnimatedGestureHandler<
   });
   const isAndroid = Platform.OS === 'android';
 
-  const handler = (
-    event: T['nativeEvent'],
-  ) => {
+  const handler = (event: T['nativeEvent']) => {
     'worklet';
 
     // const UNDETERMINED = 0;
@@ -219,8 +196,10 @@ export function useAnimatedGestureHandler<
     [],
   );
 
-  return useEvent(handler, [
-    'onGestureHandlerStateChange',
-    'onGestureHandlerEvent',
-  ]);
+  // @ts-ignore
+  return useEvent(
+    handler,
+    ['onGestureHandlerStateChange', 'onGestureHandlerEvent'],
+    false,
+  );
 }

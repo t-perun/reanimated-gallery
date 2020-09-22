@@ -1,8 +1,12 @@
 import { Dimensions } from 'react-native';
-// @ts-ignore
-import { useMapper } from 'react-native-reanimated';
-import { useState, useEffect, useRef } from 'react';
-import { GalleryItemType } from './GalleryState';
+import {
+  // @ts-ignore
+  useMapper,
+  useSharedValue as REAuseSharedValue,
+  // eslint-disable-next-line import/no-unresolved
+} from 'react-native-reanimated';
+import React, { useState, useEffect, useRef } from 'react';
+import { GalleryItemType } from './types';
 
 const dimensions = Dimensions.get('window');
 
@@ -94,10 +98,26 @@ export function useAnimatedReaction<R>(
     };
   }
   const { inputs } = inputsRef.current;
-  useMapper(() => {
-    'worklet';
+  useMapper(
+    () => {
+      'worklet';
 
-    const input = prepare();
-    react(input);
-  }, inputs);
+      const input = prepare();
+      react(input);
+    },
+    inputs,
+    [],
+  );
 }
+
+export function useSharedValue<T>(value: T) {
+  const ref = useRef<T>(null);
+  if (ref.current === null) {
+    // @ts-ignore
+    ref.current = value;
+  }
+
+  return REAuseSharedValue(ref.current);
+}
+
+export const typedMemo: <T>(c: T) => T = React.memo;

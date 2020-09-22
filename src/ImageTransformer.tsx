@@ -9,7 +9,6 @@ import {
 import Animated, {
   withSpring,
   withTiming,
-  useSharedValue,
   useAnimatedStyle,
   cancelAnimation,
   useDerivedValue,
@@ -32,9 +31,10 @@ import {
   clamp,
   workletNoop,
   useAnimatedReaction,
+  useSharedValue,
 } from './utils';
 
-const styles = {
+const styles = StyleSheet.create({
   fill: {
     ...StyleSheet.absoluteFillObject,
   },
@@ -46,7 +46,7 @@ const styles = {
   container: {
     flex: 1,
   },
-};
+});
 
 const defaultSpringConfig = {
   stiffness: 1000,
@@ -83,8 +83,7 @@ export interface ImageTransformerReusableProps {
 export interface ImageTransformerProps
   extends ImageTransformerReusableProps {
   outerGestureHandlerRefs?: React.Ref<any>[];
-  source?: ImageRequireSource;
-  uri?: string;
+  source?: ImageRequireSource | string;
   width: number;
   height: number;
   windowDimensions: {
@@ -95,7 +94,7 @@ export interface ImageTransformerProps
   isActive?: Animated.SharedValue<boolean>;
   outerGestureHandlerActive?: Animated.SharedValue<boolean>;
   springConfig?: Animated.WithSpringConfig;
-  timingConfig?: Animated.TimingConfig;
+  timingConfig?: Animated.WithTimingConfig;
   style?: ViewStyle;
   enabled?: boolean;
 }
@@ -117,7 +116,6 @@ export const ImageTransformer = React.memo<ImageTransformerProps>(
   ({
     outerGestureHandlerRefs = [],
     source,
-    uri,
     width,
     height,
     onStateChange = workletNoop,
@@ -139,15 +137,18 @@ export const ImageTransformer = React.memo<ImageTransformerProps>(
   }) => {
     fixGestureHandler();
 
-    if (typeof source === 'undefined' && typeof uri === 'undefined') {
+    if (typeof source === 'undefined') {
       throw new Error(
         'ImageTransformer: either source or uri should be passed to display an image',
       );
     }
 
-    const imageSource = source ?? {
-      uri: uri!,
-    };
+    const imageSource =
+      typeof source === 'string'
+        ? {
+            uri: source,
+          }
+        : source;
 
     const interactionsEnabled = useSharedValue(false);
     const setInteractionsEnabled = useCallback((value: boolean) => {
@@ -183,7 +184,7 @@ export const ImageTransformer = React.memo<ImageTransformerProps>(
 
     const canPanVertically = useDerivedValue(() => {
       return windowDimensions.height < targetHeight * scale.value;
-    });
+    }, []);
 
     function resetSharedState(animated?: boolean) {
       'worklet';
@@ -299,8 +300,9 @@ export const ImageTransformer = React.memo<ImageTransformerProps>(
       shouldHandleEvent: () => {
         return (
           scale.value > 1 &&
-          typeof outerGestureHandlerActive !== 'undefined' &&
-          !outerGestureHandlerActive.value &&
+          (typeof outerGestureHandlerActive !== 'undefined'
+            ? !outerGestureHandlerActive.value
+            : true) &&
           interactionsEnabled.value
         );
       },
@@ -328,10 +330,10 @@ export const ImageTransformer = React.memo<ImageTransformerProps>(
             vec.set(ctx.panOffset, ctx.pan);
           } else {
             // subtract the offset and assign fixed pan
-            const nextTranslate = vec.add([
+            const nextTranslate = vec.add(
               ctx.pan,
               vec.invert(ctx.panOffset),
-            ]);
+            );
             translation.x.value = nextTranslate.x;
 
             if (canPanVertically.value) {
@@ -345,7 +347,7 @@ export const ImageTransformer = React.memo<ImageTransformerProps>(
         panState.value = evt.state;
 
         vec.set(ctx.panOffset, 0);
-        vec.set(offset, vec.add([offset, translation]));
+        vec.set(offset, vec.add(offset, translation));
         vec.set(translation, 0);
 
         maybeRunOnEnd();
@@ -356,8 +358,6 @@ export const ImageTransformer = React.memo<ImageTransformerProps>(
 
     useAnimatedReaction(
       () => {
-        'worklet';
-
         if (typeof isActive === 'undefined') {
           return true;
         }
@@ -365,8 +365,6 @@ export const ImageTransformer = React.memo<ImageTransformerProps>(
         return isActive.value;
       },
       (currentActive) => {
-        'worklet';
-
         if (!currentActive) {
           resetSharedState();
         }
@@ -390,8 +388,9 @@ export const ImageTransformer = React.memo<ImageTransformerProps>(
       shouldHandleEvent: (evt) => {
         return (
           evt.numberOfPointers === 2 &&
-          typeof outerGestureHandlerActive !== 'undefined' &&
-          !outerGestureHandlerActive.value &&
+          (typeof outerGestureHandlerActive !== 'undefined'
+            ? !outerGestureHandlerActive.value
+            : true) &&
           interactionsEnabled.value
         );
       },
@@ -414,11 +413,11 @@ export const ImageTransformer = React.memo<ImageTransformerProps>(
 
         // this is just to be able to use with vectors
         const focal = vec.create(evt.focalX, evt.focalY);
-        const CENTER = vec.divide([canvas, 2]);
+        const CENTER = vec.divide(canvas, 2);
 
         // focal with translate offset
         // it alow us to scale into different point even then we pan the image
-        ctx.adjustFocal = vec.sub([focal, vec.add([CENTER, offset])]);
+        ctx.adjustFocal = vec.sub(focal, vec.add(CENTER, offset));
       },
 
       afterEach: (evt, ctx) => {
@@ -439,13 +438,13 @@ export const ImageTransformer = React.memo<ImageTransformerProps>(
       onActive: (evt, ctx) => {
         pinchState.value = evt.state;
 
-        const pinch = vec.sub([ctx.adjustFocal, ctx.origin]);
+        const pinch = vec.sub(ctx.adjustFocal, ctx.origin);
 
-        const nextTranslation = vec.add([
+        const nextTranslation = vec.add(
           pinch,
           ctx.origin,
-          vec.multiply([-1, ctx.gestureScale, ctx.origin]),
-        ]);
+          vec.multiply(-1, ctx.gestureScale, ctx.origin),
+        );
 
         vec.set(scaleTranslation, nextTranslation);
       },
@@ -457,7 +456,7 @@ export const ImageTransformer = React.memo<ImageTransformerProps>(
         // store scale value
         scaleOffset.value = scale.value;
 
-        vec.set(offset, vec.add([offset, scaleTranslation]));
+        vec.set(offset, vec.add(offset, scaleTranslation));
         vec.set(scaleTranslation, 0);
 
         if (scaleOffset.value < 1) {
@@ -479,8 +478,9 @@ export const ImageTransformer = React.memo<ImageTransformerProps>(
       shouldHandleEvent: (evt) => {
         return (
           evt.numberOfPointers === 1 &&
-          typeof outerGestureHandlerActive !== 'undefined' &&
-          !outerGestureHandlerActive.value &&
+          (typeof outerGestureHandlerActive !== 'undefined'
+            ? !outerGestureHandlerActive.value
+            : true) &&
           interactionsEnabled.value
         );
       },
@@ -505,24 +505,24 @@ export const ImageTransformer = React.memo<ImageTransformerProps>(
       scale.value = withTiming(DOUBLE_TAP_SCALE, timingConfig);
       scaleOffset.value = DOUBLE_TAP_SCALE;
 
-      const targetImageSize = vec.multiply([image, DOUBLE_TAP_SCALE]);
+      const targetImageSize = vec.multiply(image, DOUBLE_TAP_SCALE);
 
-      const CENTER = vec.divide([canvas, 2]);
-      const imageCenter = vec.divide([image, 2]);
+      const CENTER = vec.divide(canvas, 2);
+      const imageCenter = vec.divide(image, 2);
 
       const focal = vec.create(x, y);
 
-      const origin = vec.multiply([
+      const origin = vec.multiply(
         -1,
-        vec.sub([vec.divide([targetImageSize, 2]), CENTER]),
-      ]);
+        vec.sub(vec.divide(targetImageSize, 2), CENTER),
+      );
 
-      const koef = vec.sub([
-        vec.multiply([vec.divide([1, imageCenter]), focal]),
+      const koef = vec.sub(
+        vec.multiply(vec.divide(1, imageCenter), focal),
         1,
-      ]);
+      );
 
-      const target = vec.multiply([origin, koef]);
+      const target = vec.multiply(origin, koef);
 
       if (targetImageSize.y < canvas.y) {
         target.y = 0;
@@ -539,8 +539,9 @@ export const ImageTransformer = React.memo<ImageTransformerProps>(
       shouldHandleEvent: (evt) => {
         return (
           evt.numberOfPointers === 1 &&
-          typeof outerGestureHandlerActive !== 'undefined' &&
-          !outerGestureHandlerActive.value &&
+          (typeof outerGestureHandlerActive !== 'undefined'
+            ? !outerGestureHandlerActive.value
+            : true) &&
           interactionsEnabled.value
         );
       },
@@ -589,10 +590,12 @@ export const ImageTransformer = React.memo<ImageTransformerProps>(
           { scale: scale.value },
         ],
       };
-    });
+    }, []);
 
     return (
-      <Animated.View style={[styles.container, { width }, style]}>
+      <Animated.View
+        style={[styles.container, { width: targetWidth }, style]}
+      >
         <PinchGestureHandler
           enabled={enabled}
           ref={pinchRef}

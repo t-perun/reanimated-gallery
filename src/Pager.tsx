@@ -6,12 +6,10 @@ import React, {
   useMemo,
 } from 'react';
 import Animated, {
-  useSharedValue,
   useAnimatedStyle,
   withSpring,
   cancelAnimation,
   useDerivedValue,
-  runOnUI,
 } from 'react-native-reanimated';
 import {
   Dimensions,
@@ -30,6 +28,8 @@ import {
   fixGestureHandler,
   getShouldRender,
   workletNoop,
+  useSharedValue,
+  typedMemo,
 } from './utils';
 
 const dimensions = Dimensions.get('window');
@@ -50,9 +50,9 @@ type IGutterProps = {
   width: number;
 };
 
-function Gutter({ width }: IGutterProps) {
+const Gutter = typedMemo(function Gutter({ width }: IGutterProps) {
   return <View style={{ width }} />;
-}
+});
 
 type PageRefs = [
   React.Ref<TapGestureHandler>,
@@ -65,7 +65,7 @@ export interface RenderPageProps<T> {
   onPageStateChange: (value: boolean) => void;
   item: T;
   width: number;
-  isActive: Animated.SharedValue<boolean>;
+  isPageActive: Animated.SharedValue<boolean>;
   isPagerInProgress: Animated.SharedValue<boolean>;
 }
 
@@ -87,7 +87,7 @@ interface PageProps {
   isPagerInProgress: Animated.SharedValue<boolean>;
 }
 
-const Page = React.memo<PageProps>(
+const Page = typedMemo(
   ({
     pagerRefs,
     item,
@@ -101,12 +101,10 @@ const Page = React.memo<PageProps>(
     width,
     currentIndex,
     isPagerInProgress,
-  }) => {
-    const isActive = useDerivedValue(() => {
-      // FIXME: This causes crashe
-      // return currentIndex.value === index;
-      return false;
-    });
+  }: PageProps) => {
+    const isPageActive = useDerivedValue(() => {
+      return currentIndex.value === index;
+    }, []);
 
     return (
       <View
@@ -135,7 +133,7 @@ const Page = React.memo<PageProps>(
               onPageStateChange,
               item,
               width,
-              isActive,
+              isPageActive,
               isPagerInProgress,
             },
             index,
@@ -203,7 +201,10 @@ function workletNoopTrue() {
   return true;
 }
 
-export function Pager<TPages, ItemT = UnpackItemT<TPages>>({
+export const Pager = typedMemo(function Pager<
+  TPages,
+  ItemT = UnpackItemT<TPages>
+>({
   pages,
   initialIndex,
   totalCount,
@@ -249,7 +250,6 @@ export function Pager<TPages, ItemT = UnpackItemT<TPages>>({
     isActive.value = value;
   }
 
-  const scale = useSharedValue(1);
   const velocity = useSharedValue(0);
 
   const [diffValue, setDiffValue] = useState(initialDiffValue);
@@ -271,9 +271,9 @@ export function Pager<TPages, ItemT = UnpackItemT<TPages>>({
 
   const totalWidth = useDerivedValue(() => {
     return length.value * width + gutterWidth * length.value - 2;
-  });
+  }, []);
 
-  const onIndexChangeCb = useCallback((nextIndex) => {
+  const onIndexChangeCb = useCallback((nextIndex: number) => {
     'worklet';
 
     if (onIndexChange) {
@@ -284,11 +284,9 @@ export function Pager<TPages, ItemT = UnpackItemT<TPages>>({
   }, []);
 
   useEffect(() => {
-    runOnUI(() => {
-      offsetX.value = getPageTranslate(initialIndex);
-      index.value = initialIndex;
-      onIndexChangeCb(initialIndex);
-    })();
+    offsetX.value = getPageTranslate(initialIndex);
+    index.value = initialIndex;
+    onIndexChangeCb(initialIndex);
   }, [initialIndex]);
 
   const onChangePageAnimation = (noVelocity?: boolean) => {
@@ -388,7 +386,7 @@ export function Pager<TPages, ItemT = UnpackItemT<TPages>>({
       Math.floor(Math.abs(getPageTranslate(index.value))) !==
       Math.floor(Math.abs(offsetX.value + pagerX.value))
     );
-  });
+  }, []);
 
   const onPan = useAnimatedGestureHandler<
     PanGestureHandlerGestureEvent,
@@ -440,8 +438,6 @@ export function Pager<TPages, ItemT = UnpackItemT<TPages>>({
         ? -getPageTranslate(nextIndex)
         : -getPageTranslate(index.value));
 
-      console.log(toValueAnimation.value, nextIndex, evt.velocityX);
-
       onChangePageAnimation(!shouldMoveToNextPage);
 
       if (shouldMoveToNextPage) {
@@ -457,17 +453,10 @@ export function Pager<TPages, ItemT = UnpackItemT<TPages>>({
     },
 
     onStart: () => {
-      if (scale.value !== 1) {
-        return;
-      }
       cancelAnimation(offsetX);
     },
 
     onEnd: () => {
-      if (scale.value !== 1) {
-        return;
-      }
-
       onChangePageAnimation(true);
     },
   });
@@ -485,49 +474,68 @@ export function Pager<TPages, ItemT = UnpackItemT<TPages>>({
         },
       ],
     };
-  });
+  }, []);
 
   const pagerRefs = useMemo<PageRefs>(() => [pagerRef, tapRef], []);
 
-  const pagesToRender = [];
+  const pagesToRender = useMemo(() => {
+    const temp = [];
 
-  for (let i = 0; i < totalCount; i += 1) {
-    let itemToUse;
+    for (let i = 0; i < totalCount; i += 1) {
+      let itemToUse;
 
-    if (typeof getItem === 'function') {
-      itemToUse = getItem(pages, i);
-    } else if (Array.isArray(pages)) {
-      itemToUse = pages[i];
-    } else {
-      throw new Error(
-        'Pager: items either should be an array of getItem should be defined',
-      );
+      if (typeof getItem === 'function') {
+        itemToUse = getItem(pages, i);
+      } else if (Array.isArray(pages)) {
+        itemToUse = pages[i];
+      } else {
+        throw new Error(
+          'Pager: items either should be an array of getItem should be defined',
+        );
+      }
+
+      const shouldRender = getShouldRender(i, activeIndex, diffValue);
+
+      if (!shouldRender) {
+        temp.push(null);
+      } else {
+        temp.push(
+          <Page
+            key={keyExtractor(itemToUse, i)}
+            item={itemToUse}
+            currentIndex={index}
+            pagerRefs={pagerRefs}
+            onPageStateChange={onPageStateChange}
+            index={i}
+            length={totalCount}
+            gutterWidth={gutterWidth}
+            renderPage={renderPage}
+            getPageTranslate={getPageTranslate}
+            width={width}
+            isPagerInProgress={isPagerInProgress}
+            shouldRenderGutter={shouldRenderGutter}
+          />,
+        );
+      }
     }
 
-    const shouldRender = getShouldRender(i, activeIndex, diffValue);
-
-    if (!shouldRender) {
-      pagesToRender.push(null);
-    } else {
-      pagesToRender.push(
-        <Page
-          key={keyExtractor(itemToUse, i)}
-          item={itemToUse}
-          currentIndex={index}
-          pagerRefs={pagerRefs}
-          onPageStateChange={onPageStateChange}
-          index={i}
-          length={totalCount}
-          gutterWidth={gutterWidth}
-          renderPage={renderPage}
-          getPageTranslate={getPageTranslate}
-          width={width}
-          isPagerInProgress={isPagerInProgress}
-          shouldRenderGutter={shouldRenderGutter}
-        />,
-      );
-    }
-  }
+    return temp;
+  }, [
+    keyExtractor,
+    getItem,
+    totalCount,
+    pages,
+    getShouldRender,
+    index,
+    pagerRefs,
+    onPageStateChange,
+    gutterWidth,
+    renderPage,
+    getPageTranslate,
+    width,
+    isPagerInProgress,
+    shouldRenderGutter,
+  ]);
 
   return (
     <View style={StyleSheet.absoluteFillObject}>
@@ -535,6 +543,7 @@ export function Pager<TPages, ItemT = UnpackItemT<TPages>>({
         <PanGestureHandler
           ref={pagerRef}
           activeOffsetX={[-4, 4]}
+          activeOffsetY={[-4, 4]}
           simultaneousHandlers={tapRef}
           onGestureEvent={onPan}
         >
@@ -561,4 +570,4 @@ export function Pager<TPages, ItemT = UnpackItemT<TPages>>({
       </Animated.View>
     </View>
   );
-}
+});

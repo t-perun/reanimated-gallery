@@ -15,7 +15,7 @@ import {
   StandaloneGallery,
   createAnimatedGestureHandler,
   RenderImageProps,
-} from 'reanimated-gallery';
+} from 'react-native-gallery-toolkit';
 
 import {
   RectButton,
@@ -31,6 +31,10 @@ import {
   StackNavigationOptions,
   HeaderBackButton,
 } from '@react-navigation/stack';
+import {
+  DetachedHeader,
+  HeaderPropsScrapper,
+} from '../DetachedHeader';
 
 const dimensions = Dimensions.get('window');
 
@@ -152,7 +156,7 @@ export function useToggleOpacity(
       }),
       transform: [{ translateY: translateY.value }],
     };
-  });
+  }, []);
 
   return styles;
 }
@@ -251,7 +255,7 @@ export default function FullFeatured() {
     return {
       transform: [{ translateY: bottomTranslateY.value }],
     };
-  });
+  }, []);
 
   function handleClose() {
     nav.goBack();
@@ -301,7 +305,7 @@ export default function FullFeatured() {
         translateY: translateY.value,
       },
     ],
-  }));
+  }), []);
 
   return (
     <View style={{ flex: 1 }}>
@@ -340,17 +344,17 @@ export default function FullFeatured() {
               </View>
             );
           }}
-          onInteraction={() => {
+          onInteraction={useCallback(() => {
             hide();
-          }}
-          onTap={() => {
+          }, [])}
+          onTap={useCallback(() => {
             toggleHeaderShown();
-          }}
-          onDoubleTap={(isScaled) => {
+          }, [])}
+          onDoubleTap={useCallback((isScaled: boolean) => {
             if (!isScaled) {
               hide();
             }
-          }}
+          }, [])}
           numToRender={2}
           shouldPagerHandleGestureEvent={
             shouldPagerHandleGestureEvent
@@ -402,34 +406,28 @@ function CustomHeader({
   bottomTranslateY: Animated.SharedValue<number>;
   headerShown: Animated.SharedValue<boolean>;
 }) {
-  const nav = useNavigation();
+  const style = useAnimatedStyle(
+    () => ({
 
-  const style = useAnimatedStyle(() => ({
-    height: HEADER_HEIGHT,
-    paddingTop: STATUS_BAR_HEIGHT,
-    backgroundColor: 'white',
-    justifyContent: 'center',
-    zIndex: 1,
-    transform: [
-      {
-        translateY: bottomTranslateY.value * -1,
-      },
-    ],
-  }));
+      zIndex: 1,
+      transform: [
+        {
+          translateY: bottomTranslateY.value * -1,
+        },
+      ],
+    }),
+    [],
+  );
 
   const opacityAnimatedStyles = useToggleOpacity(headerShown);
 
   return (
     <Animated.View style={[style, opacityAnimatedStyles]}>
-      <HeaderBackButton onPress={nav.goBack} />
+      <DetachedHeader />
     </Animated.View>
   );
 }
 
 FullFeatured.options = (): StackNavigationOptions => ({
-  headerTransparent: true,
-  headerBackground: () => (
-    <View style={{ backgroundColor: 'white', flex: 1 }} />
-  ),
-  headerShown: false,
+  header: HeaderPropsScrapper,
 });
