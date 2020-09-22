@@ -47,7 +47,7 @@ const defaultConstants = {
   MAX_SCALE: 2,
   MIN_SCALE: 0.7,
   OVER_SCALE: 0.5,
-}
+};
 
 const defaultTimingConfig = {
   duration: 250,
@@ -86,7 +86,9 @@ const AnimatedImageComponent = Animated.createAnimatedComponent(
   Image,
 );
 
-export const SimpleScalableImage = React.memo<SimpleScalableImageProps>(
+export const SimpleScalableImage = React.memo<
+  SimpleScalableImageProps
+>(
   ({
     outerGestureHandlerRefs = [],
     source,
@@ -141,14 +143,10 @@ export const SimpleScalableImage = React.memo<SimpleScalableImageProps>(
     const scaleTranslation = vec.useSharedVector(0, 0);
     const offset = vec.useSharedVector(0, 0);
 
-    const canvas = vec.create(
-      width,
-      height,
-    );
+    const canvas = vec.create(width, height);
     const targetWidth = windowDimensions.width;
     const scaleFactor = width / targetWidth;
     const targetHeight = height / scaleFactor;
-
 
     // TODO: check
     function resetSharedState(animated?: boolean) {
@@ -228,11 +226,11 @@ export const SimpleScalableImage = React.memo<SimpleScalableImageProps>(
 
         // this is just to be able to use with vectors
         const focal = vec.create(evt.focalX, evt.focalY);
-        const CENTER = vec.divide([canvas, 2]);
+        const CENTER = vec.divide(canvas, 2);
 
         // focal with translate offset
         // it alow us to scale into different point even then we pan the image
-        ctx.adjustFocal = vec.sub([focal, vec.add([CENTER, offset])]);
+        ctx.adjustFocal = vec.sub(focal, vec.add(CENTER, offset));
       },
 
       afterEach: (evt, ctx) => {
@@ -248,26 +246,28 @@ export const SimpleScalableImage = React.memo<SimpleScalableImageProps>(
         cancelAnimation(offset.x);
         cancelAnimation(offset.y);
         vec.set(ctx.origin, ctx.adjustFocal);
-        zindex.value = 10
+        zindex.value = 10;
       },
 
       onActive: (evt, ctx) => {
         pinchState.value = evt.state;
 
-        const pinch = vec.sub([ctx.adjustFocal, ctx.origin]);
+        const pinch = vec.sub(ctx.adjustFocal, ctx.origin);
 
-        const nextTranslation = vec.add([
+        const nextTranslation = vec.add(
           pinch,
           ctx.origin,
-          vec.multiply([-1, ctx.gestureScale, ctx.origin]),
-        ]);
+          vec.multiply(-1, ctx.gestureScale, ctx.origin),
+        );
 
         vec.set(scaleTranslation, nextTranslation);
       },
 
       onEnd: () => {
-        scaleTranslation.x.value = withTiming(0, timingConfig, () => {zindex.value = -1})
-        scaleTranslation.y.value = withTiming(0, timingConfig)
+        scaleTranslation.x.value = withTiming(0, timingConfig, () => {
+          zindex.value = -1;
+        });
+        scaleTranslation.y.value = withTiming(0, timingConfig);
 
         scale.value = withTiming(1, timingConfig);
         scaleOffset.value = 1;
@@ -289,7 +289,7 @@ export const SimpleScalableImage = React.memo<SimpleScalableImageProps>(
 
       onActive: () => {
         onDoubleTap(scale.value > 1);
-        console.log('Double tap for like')
+        console.log('Double tap for like');
       },
     });
 
@@ -330,21 +330,21 @@ export const SimpleScalableImage = React.memo<SimpleScalableImageProps>(
 
     const animatedBlackStyles = useAnimatedStyle(() => {
       return {
-        backgroundColor:'black',
-        opacity: 1 - 1/scale.value + 0.1,
+        backgroundColor: 'black',
+        opacity: 1 - 1 / scale.value + 0.1,
         zIndex: 0,
-        flex:1,
+        flex: 1,
         transform: [
           {
-            scale: scale.value > 1 ? 10 : 0
-          }
-        ]
-      }
-    })
+            scale: scale.value > 1 ? 10 : 0,
+          },
+        ],
+      };
+    });
 
     return (
       <Animated.View style={[styles.container, { width }, style]}>
-        <Animated.View style={animatedBlackStyles}/>
+        <Animated.View style={animatedBlackStyles} />
         <PinchGestureHandler
           enabled={enabled}
           ref={pinchRef}
@@ -371,15 +371,14 @@ export const SimpleScalableImage = React.memo<SimpleScalableImageProps>(
               onGestureEvent={onDoubleTapEvent}
             >
               <Animated.View style={animatedStyles}>
-                  <AnimatedImageComponent
-                    onLoad={onLoadImageSuccess}
-                    source={imageSource}
-                    style={{
-                      width: targetWidth,
-                      height: targetHeight,
-                    }}
-                  />
-
+                <AnimatedImageComponent
+                  onLoad={onLoadImageSuccess}
+                  source={imageSource}
+                  style={{
+                    width: targetWidth,
+                    height: targetHeight,
+                  }}
+                />
               </Animated.View>
             </TapGestureHandler>
           </Animated.View>
